@@ -1,0 +1,27 @@
+# Systemd unit for Spree Puma (server app)
+# Install: sudo cp deploy/spree.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable spree
+
+[Unit]
+Description=Spree Puma application server
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/var/www/spree/current/server
+
+Environment=RAILS_ENV=production
+EnvironmentFile=-/var/www/spree/current/server/.env.production
+
+ExecStart=/home/deploy/.rbenv/shims/bundle exec puma -C config/puma.rb
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

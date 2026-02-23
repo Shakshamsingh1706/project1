@@ -1,0 +1,21 @@
+# MySQL configuration. Use env vars: DB_NAME, DB_USER, DB_PASS, DB_HOST
+
+default: &default
+  adapter: mysql2
+  encoding: utf8mb4
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  username: <%= ENV["DB_USER"] %>
+  password: <%= ENV["DB_PASS"] %>
+  host: <%= ENV["DB_HOST"] || "127.0.0.1" %>
+
+development:
+  <<: *default
+  database: <%= ENV["DB_NAME"] || "spree_development" %>
+
+test:
+  <<: *default
+  database: <%= ENV["DB_NAME"] || "spree_test" %>
+
+production:
+  <<: *default
+  database: <%= ENV["DB_NAME"] || "spree_production" %>

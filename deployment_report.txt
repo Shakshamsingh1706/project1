@@ -1,0 +1,91 @@
+==============================================
+DEPLOYMENT DIAGNOSTIC REPORT
+Generated: 2026-02-23T17:28:14+05:30
+==============================================
+
+--- SYSTEM ---
+Linux shaksham-ThinkPad-L470 6.14.0-37-generic #37~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 10:25:38 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           783M  2.2M  781M   1% /run
+/dev/sda2       228G   98G  119G  46% /
+tmpfs           3.9G   53M  3.8G   2% /dev/shm
+tmpfs           5.0M  8.0K  5.0M   1% /run/lock
+efivarfs        154K   42K  108K  28% /sys/firmware/efi/efivars
+/dev/sda1       1.1G  6.2M  1.1G   1% /boot/efi
+tmpfs           783M  156K  783M   1% /run/user/1000
+
+               total        used        free      shared  buff/cache   available
+Mem:           7.6Gi       5.3Gi       1.1Gi       845Mi       2.2Gi       2.3Gi
+Swap:          4.0Gi       2.4Gi       1.6Gi
+
+--- RUBY ---
+/home/shaksham/.rbenv/shims/ruby
+rbenv: version `3.2' is not installed (set by /home/shaksham/a/spree/.ruby-version)
+/home/shaksham/.rbenv/shims/bundle
+rbenv: version `3.2' is not installed (set by /home/shaksham/a/spree/.ruby-version)
+  3.2.2
+
+--- NODE ---
+v18.20.8
+1.22.22
+
+--- MYSQL ---
+● mysql.service - MySQL Community Server
+     Loaded: loaded (/usr/lib/systemd/system/mysql.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2026-02-22 15:43:13 IST; 1 day 1h ago
+   Main PID: 1700 (mysqld)
+     Status: "Server is operational"
+      Tasks: 39 (limit: 9200)
+     Memory: 46.2M (peak: 447.6M swap: 445.8M swap peak: 466.6M)
+        CPU: 16min 41.839s
+     CGroup: /system.slice/mysql.service
+             └─1700 /usr/sbin/mysqld
+
+Feb 22 15:43:11 shaksham-ThinkPad-L470 systemd[1]: Starting mysql.service - MySQL Community Server...
+Feb 22 15:43:13 shaksham-ThinkPad-L470 systemd[1]: Started mysql.service - MySQL Community Server.
+
+mysqld is alive
+
+--- RAILS ---
+rbenv: version `4.0.1' is not installed (set by /home/shaksham/a/spree/server/.ruby-version)
+
+rbenv: version `4.0.1' is not installed (set by /home/shaksham/a/spree/server/.ruby-version)
+
+--- PORTS ---
+(no listener on 3000 or ss failed)
+
+(no puma in ss or ss failed)
+
+--- SERVICES ---
+○ spree.service - Spree Rails Application (Puma)
+     Loaded: loaded (/etc/systemd/system/spree.service; disabled; preset: enabled)
+     Active: inactive (dead)
+(spree service not found or not available)
+
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2026-02-22 15:43:17 IST; 1 day 1h ago
+       Docs: man:nginx(8)
+   Main PID: 2331 (nginx)
+      Tasks: 5 (limit: 9200)
+     Memory: 1.9M (peak: 5.5M swap: 3.0M swap peak: 3.1M)
+        CPU: 81ms
+     CGroup: /system.slice/nginx.service
+             ├─2331 "nginx: master process /usr/sbin/nginx -g daemon on; master_process on;"
+             ├─2332 "nginx: worker process"
+             ├─2333 "nginx: worker process"
+             ├─2334 "nginx: worker process"
+             └─2335 "nginx: worker process"
+
+Feb 22 15:43:17 shaksham-ThinkPad-L470 systemd[1]: Starting nginx.service - A high performance web server and a reverse proxy server...
+Feb 22 15:43:17 shaksham-ThinkPad-L470 systemd[1]: Started nginx.service - A high performance web server and a reverse proxy server.
+
+==============================================
+END OF REPORT
+==============================================

@@ -1,0 +1,1 @@
+Rails booted successfully in production mode with MySQL and without spree_stripe extension.

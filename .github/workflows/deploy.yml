@@ -1,0 +1,62 @@
+# Zero-touch deploy on push to main
+# Secrets: SERVER_IP, DEPLOY_KEY
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.2"
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: cd server && bundle install --without development test
+
+      - name: Zeitwerk check
+        run: cd server && bundle exec rails zeitwerk:check
+        env:
+          RAILS_ENV: production
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE || 'dummy_for_ci' }}
+
+      - name: Precompile assets
+        run: cd server && bundle exec rails assets:precompile
+        env:
+          RAILS_ENV: production
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE || 'dummy_for_precompile' }}
+
+  cd:
+    name: CD
+    runs-on: ubuntu-latest
+    needs: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key deploy@$SERVER_IP '
+            set -e
+            cd /var/www/spree/current
+            git fetch origin main
+            git reset --hard origin/main
+            cd server
+            /home/deploy/.rbenv/shims/bundle install --without development test --deployment
+            RAILS_ENV=production /home/deploy/.rbenv/shims/bundle exec rails db:migrate
+            sudo systemctl restart spree
+          '
+          rm -f ~/.ssh/deploy_key
