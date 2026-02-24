@@ -67,20 +67,33 @@ if [[ -f "$SERVER_DIR/.env.production" ]]; then
   set +a
 fi
 
-# Use deploy's bundle when run as root (sudo)
-BUNDLE_CMD="bundle"
-if [[ "$(id -u)" -eq 0 ]] && [[ -x /home/deploy/.rbenv/shims/bundle ]]; then
-  BUNDLE_CMD="/home/deploy/.rbenv/shims/bundle"
-fi
+# When run as root (sudo), run Rails as the server dir owner so bundle/rbenv are in PATH
+run_rails() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    local owner
+    owner="$(stat -c '%U' "$SERVER_DIR" 2>/dev/null)" || true
+    if [[ -n "$owner" ]] && [[ "$owner" != "root" ]]; then
+      (cd "$SERVER_DIR" && su - "$owner" -c "cd \"$SERVER_DIR\" && export \$(grep -v '^#' .env.production 2>/dev/null | xargs) && RAILS_ENV=production bundle exec rails $*")
+      return
+    fi
+    for rbenv_home in /home/deploy /home/spree; do
+      if [[ -x "$rbenv_home/.rbenv/shims/bundle" ]]; then
+        (cd "$SERVER_DIR" && RAILS_ENV=production "$rbenv_home/.rbenv/shims/bundle" exec rails "$@")
+        return
+      fi
+    done
+  fi
+  (cd "$SERVER_DIR" && RAILS_ENV=production bundle exec rails "$@")
+}
 
 # 6. db:prepare
-if ! (cd "$SERVER_DIR" && RAILS_ENV=production $BUNDLE_CMD exec rails db:prepare); then
+if ! run_rails db:prepare; then
   echo "FAILURE: rails db:prepare failed"
   exit 1
 fi
 
 # 7. assets:precompile
-if ! (cd "$SERVER_DIR" && RAILS_ENV=production $BUNDLE_CMD exec rails assets:precompile); then
+if ! run_rails assets:precompile; then
   echo "FAILURE: rails assets:precompile failed"
   exit 1
 fi
