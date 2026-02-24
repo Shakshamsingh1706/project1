@@ -6,95 +6,105 @@ on:
 
 jobs:
 
+  # -------------------------
+  # CI JOB (runs on GitHub)
+  # -------------------------
   ci:
     name: CI
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: server
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Ruby
+      # Installs Ruby + ALL gems from server/Gemfile
+      - name: Setup Ruby & install gems
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.2.2
           bundler-cache: true
+          working-directory: server
 
-      # Bundler 4 compatible install
-      - name: Configure Bundler (production groups only)
+      # Ensure database-less Rails boot for CI
+      - name: Prepare Rails environment
         run: |
-          cd server
-          bundle config set --local without 'development test'
-
-      - name: Zeitwerk check
-        run: |
-          cd server
-          bundle exec rails zeitwerk:check
+          mkdir -p tmp
         env:
           RAILS_ENV: production
           SECRET_KEY_BASE: dummy_ci_key
 
-      - name: Precompile assets
-        run: |
-          cd server
-          bundle exec rails assets:precompile
+      - name: Zeitwerk check (verifies Rails boots)
+        run: bundle exec rails zeitwerk:check
+        env:
+          RAILS_ENV: production
+          SECRET_KEY_BASE: dummy_ci_key
+
+      - name: Precompile assets (verifies full app load)
+        run: bundle exec rails assets:precompile
         env:
           RAILS_ENV: production
           SECRET_KEY_BASE: dummy_assets_key
 
 
+  # -------------------------
+  # CD JOB (deploy to server)
+  # -------------------------
   cd:
-    name: CD
+    name: Deploy to Server
     runs-on: ubuntu-latest
     needs: ci
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Setup SSH key
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           mkdir -p ~/.ssh
           echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          touch ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
 
-      - name: Deploy to server
+      - name: Deploy application
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           ssh -i ~/.ssh/deploy_key deploy@$SERVER_IP << 'EOF'
             set -e
 
-            echo "Updating code..."
+            echo "---- Updating repository ----"
             cd /var/www/spree/current
             git fetch origin main
             git reset --hard origin/main
 
-            echo "Loading rbenv..."
+            echo "---- Loading rbenv ----"
             export RBENV_ROOT="$HOME/.rbenv"
             export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
             eval "$(rbenv init - bash)"
 
             cd server
 
-            echo "Installing gems..."
+            echo "---- Installing gems (production only) ----"
             bundle config set --local without 'development test'
             bundle install --deployment
 
-            echo "Migrating DB..."
+            echo "---- Database migrate ----"
             RAILS_ENV=production bundle exec rails db:migrate
 
-            echo "Precompiling assets..."
+            echo "---- Precompile assets ----"
             RAILS_ENV=production bundle exec rails assets:precompile
 
-            echo "Restarting Puma..."
+            echo "---- Restart Puma ----"
             sudo systemctl restart spree
 
-            echo "Deployment complete."
+            echo "Deployment completed successfully."
           EOF
 
       - name: Cleanup SSH key
