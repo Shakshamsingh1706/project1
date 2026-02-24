@@ -1,4 +1,4 @@
-name: CI-CD-Deploy
+name: Rails-CI-CD
 
 on:
   push:
@@ -6,7 +6,9 @@ on:
 
 jobs:
 
-  # ---------------- CI ----------------
+  ############################
+  # CI — runs on GitHub runner
+  ############################
   ci:
     runs-on: ubuntu-latest
 
@@ -18,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Installs Ruby and ALL gems properly
+      # Install correct Ruby + Bundler automatically
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -26,77 +28,81 @@ jobs:
           bundler-cache: true
           working-directory: server
 
-      # Bundler 4 FIX (critical)
-      - name: Install gems correctly
+      # FORCE Bundler 4 compatible install
+      - name: Install Gems (Bundler 4 safe)
         run: |
-          bundle config set path vendor/bundle
+          rm -rf .bundle
+          bundle config set --local path 'vendor/bundle'
+          bundle config set --local deployment 'false'
           bundle install
 
-      # Rails boot verification
-      - name: Rails boot check
+      # Check Rails actually boots
+      - name: Rails autoload check
         run: bundle exec rails zeitwerk:check
         env:
           RAILS_ENV: production
-          SECRET_KEY_BASE: dummy_ci_key
+          SECRET_KEY_BASE: ci_dummy_key
 
-      # Asset compilation test
-      - name: Asset compilation
+      # Compile assets (verifies full environment)
+      - name: Asset precompile
         run: bundle exec rails assets:precompile
         env:
           RAILS_ENV: production
-          SECRET_KEY_BASE: dummy_assets_key
+          SECRET_KEY_BASE: ci_assets_key
 
 
-  # ---------------- CD ----------------
+  ############################
+  # CD — deploy to your VM
+  ############################
   deploy:
     needs: ci
     runs-on: ubuntu-latest
 
     steps:
-      - name: Setup SSH
+      - name: Prepare SSH
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/key
-          chmod 600 ~/.ssh/key
+          echo "$DEPLOY_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
 
-      - name: Deploy to server
+      - name: Deploy application
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          ssh -i ~/.ssh/key deploy@$SERVER_IP << 'EOF'
+          ssh -i ~/.ssh/id_rsa deploy@$SERVER_IP << 'EOF'
             set -e
 
-            echo "Pulling latest code"
+            echo "Updating code..."
             cd /var/www/spree/current
             git fetch origin main
             git reset --hard origin/main
 
-            echo "Loading Ruby (rbenv)"
+            echo "Loading rbenv..."
             export RBENV_ROOT="$HOME/.rbenv"
             export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
             eval "$(rbenv init - bash)"
 
             cd server
 
-            echo "Installing production gems"
+            echo "Installing production gems..."
             bundle config set --local without 'development test'
             bundle install --deployment
 
-            echo "Migrating database"
+            echo "Running DB migrations..."
             RAILS_ENV=production bundle exec rails db:migrate
 
-            echo "Precompiling assets"
+            echo "Precompiling assets..."
             RAILS_ENV=production bundle exec rails assets:precompile
 
-            echo "Restarting application"
+            echo "Restarting Puma service..."
             sudo systemctl restart spree
 
-            echo "Done."
+            echo "Deployment successful"
           EOF
 
-      - name: Cleanup
-        run: rm -f ~/.ssh/key
+      - name: Cleanup SSH key
+        run: rm -f ~/.ssh/id_rsa
